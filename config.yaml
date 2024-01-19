@@ -1,0 +1,106 @@
+# A stage in interest
+# Stage 1: Data preprocessing
+# Stage 2: Training
+# Stage 3: Inference in Batch / Instance
+# Stage 4: Deployment
+
+stage: 3
+
+# Path for Project
+
+main_path: "/home/ubuntu/user/swryu/ner_pipeline" # On AWS
+
+# Stage1: Preprocessing for public dataset
+stage1_cfg:
+  in_path: ${main_path}/train/data
+  out_path: ${stage1_cfg.in_path}/preprocessed
+  fig_path: ${main_path}/train/figure
+  need_debug: false
+
+# Stage2: Train + Validate a model
+stage2_cfg:
+  task: pretrain # pretrain / finetune
+
+  common:
+    # Setting
+    seed: 777
+    use_ddp: false
+    use_fp16: false
+    use_clipping: true
+    # Logging
+    exp_name: NER_Pipeline
+    entity: swryu
+    result_path: ${main_path}/train/results
+    # Model
+    model: ner_with_electra
+    num_label: 15
+    # Model Path
+    model_path: ${main_path}/pretrained_ner
+
+  pretrain:
+    do_train: true # False = Only Inference
+
+    model:
+      model: ner_with_head
+      size: small # [small, base]
+      script: false # torchscript
+
+    training:
+      # Data
+      in_path: ${stage1_cfg.in_path}/completed
+      load_pretrained: false
+      # Experiment
+      batch_size: 64
+      epochs: 500
+      lr: 3e-5
+      patience: 7
+      grad_norm: 0.5
+      scheduler:
+        which: null # null, StepLR
+        StepLR:
+          step_size: 3
+          gamma: 0.1
+
+    eval:
+      # Experiment
+      batch_size: 8
+      # Et cetera.
+      valid_set: valid # valid / valid, test
+
+# Stage 3: Inference only
+stage3_cfg:
+  task: ${stage2_cfg.task}
+  common: ${stage2_cfg.common}
+  pretrain: ${stage2_cfg.pretrain}
+
+  unit: inference # batch , inference
+
+  unit_info:
+    batch: null
+
+    inference:
+      engine_name: postgresql://demo:admin@localhost:5432/ner_demo
+      table_name: ner_valid_data # lower_case
+      row_index: 0
+
+# Stage 4: Deploy only
+stage4_cfg:
+  task: ${stage2_cfg.task}
+  common: ${stage2_cfg.common}
+  pretrain: ${stage2_cfg.pretrain}
+
+  ml_server_exist: true
+
+  app_server:
+    host: 127.0.0.1
+    port: 8000
+
+  ml_server:
+    host: 127.0.0.1
+    # host: 0.0.0.0
+    port: 8080
+
+serialize:
+  size: ${stage2_cfg.pretrain.model.size}
+  model_save_path: ${main_path}/pretrained_ner_script
+  model_name: NERmodel

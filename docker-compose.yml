@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+
+  demo_server:
+    build: 
+      context: .
+      dockerfile: ./docker/demo/Dockerfile
+    image: demo:v1
+    container_name: demo
+    ports: 
+      - "8501:8501"
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+
+  app_server:
+    build: 
+      context: .
+      dockerfile: ./docker/app/Dockerfile
+    image: app_server:v1
+    container_name: app
+    ports: 
+      - "8000:8000"
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+
+  ml_server:
+    build:
+      context: .
+      dockerfile: ./docker/ml/Dockerfile
+    image: ml_server:v1
+    container_name: mar
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "8082:8082"
+    tty: true
+    stdin_open: true
+    network_mode: "host"
+    volumes:
+      - ./model_store:/ml_server/model_store
+      
+
